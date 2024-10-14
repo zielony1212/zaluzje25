@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konfigurator Żaluzji Drewnianych 25mm</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .config-section {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        select, input {
+            padding: 5px;
+            width: 200px;
+        }
+        .summary {
+            font-weight: bold;
+        }
+        #order-summary {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Konfigurator Żaluzji Drewnianych 25mm</h1>
+
+<div class="config-section">
+    <label for="width">Szerokość (cm):</label>
+    <input type="number" id="width" min="40" max="260">
+</div>
+
+<div class="config-section">
+    <label for="height">Wysokość (cm):</label>
+    <input type="number" id="height" min="40" max="260">
+</div>
+
+<div class="config-section">
+    <label for="color">Kolor:</label>
+    <select id="color">
+        <option value="Pirat Black">Pirat Black</option>
+        <option value="Charcoal">Charcoal</option>
+        <option value="Ash">Ash</option>
+        <option value="Cloud">Cloud</option>
+        <option value="Mist">Mist</option>
+        <option value="Sand">Sand</option>
+        <option value="Pearl">Pearl</option>
+        <option value="Snow White">Snow White</option>
+        <option value="Black">Black</option>
+        <option value="Wenge">Wenge</option>
+        <option value="Natural">Natural</option>
+        <option value="Beige">Beige</option>
+        <option value="White">White</option>
+    </select>
+</div>
+
+<div class="config-section">
+    <label for="side_control">Strona sterowania:</label>
+    <select id="side_control">
+        <option value="Left">Lewa</option>
+        <option value="Right">Prawa</option>
+    </select>
+</div>
+
+<div class="config-section">
+    <label for="cord_guide">Prowadzenie żyłkowe (+10zł):</label>
+    <input type="checkbox" id="cord_guide">
+</div>
+
+<div class="config-section">
+    <label for="installation">Montaż:</label>
+    <select id="installation">
+        <option value="Inwazyjny">Inwazyjny</option>
+        <option value="Bezinwazyjny">Bezinwazyjny</option>
+    </select>
+</div>
+
+<button onclick="calculatePrice()">Oblicz cenę</button>
+<button onclick="addToOrder()">Dodaj do zamówienia</button>
+<button onclick="generatePDF()">Zapisz zamówienie jako PDF</button>
+
+<h2>Podsumowanie</h2>
+<p class="summary" id="summary">Cena: 0zł</p>
+<p id="units">Liczba sztuk (Allegro): 0</p>
+
+<h2>Zamówienie</h2>
+<div id="order-summary">
+    <ul id="order-list"></ul>
+    <p class="summary" id="total-price">Całkowita cena: 0zł</p>
+    <p class="summary" id="total-units">Całkowita liczba sztuk (Allegro): 0</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<script>
+    const priceTable = {
+        40: [154, 170, 188, 203, 221, 238, 253, 268, 283, 301, 317, 335, 352, 365, 383],
+        60: [176, 197, 218, 238, 263, 283, 305, 325, 347, 368, 403, 413, 433, 458, 475],
+        80: [199, 227, 253, 283, 308, 335, 358, 388, 416, 443, 473, 497, 524, 551, 578],
+        100: [221, 253, 283, 317, 350, 380, 413, 446, 478, 508, 541, 575, 607, 644, 673],
+        120: [242, 283, 320, 358, 395, 433, 470, 508, 545, 583, 614, 646, 688, 730, 773],
+        140: [268, 310, 350, 395, 440, 478, 523, 566, 608, 650, 694, 739, 779, 820, 863],
+        160: [290, 335, 380, 433, 485, 530, 578, 628, 673, 727, 775, 823, 871, 919, 968],
+        180: [311, 365, 418, 470, 523, 578, 631, 686, 739, 790, 844, 899, 952, 1004, 1058],
+        200: [335, 388, 452, 508, 575, 628, 689, 749, 808, 863, 925, 986, 1045, 1102, 1160],
+        220: [356, 418, 482, 545, 613, 680, 740, 803, 868, 932, 997, 1063, 1126, 1189, 1253],
+        240: [380, 448, 518, 583, 662, 728, 797, 868, 937, 1001, 1075, 1148, 1217, 1289, 1355],
+        260: [401, 473, 548, 623, 703, 778, 850, 923, 998, 1073, 1150, 1228, 1296, 1301, 1448]
+    };
+
+    let totalPrice = 0;
+    let totalUnits = 0;
+    let orders = [];
+
+    function roundUpToNearestTen(value) {
+        return Math.ceil(value / 10) * 10;
+    }
+
+    function roundUpToNearestTwenty(value) {
+        return Math.ceil(value / 20) * 20;
+    }
+
+    function calculatePrice() {
+        let width = parseInt(document.getElementById('width').value);
+        let height = parseInt(document.getElementById('height').value);
+        let cordGuide = document.getElementById('cord_guide').checked;
+
+        // Zaokrąglanie szerokości do najbliższej wartości co 10 cm
+        width = roundUpToNearestTen(width);
+        // Zaokrąglanie wysokości do najbliższej wartości co 20 cm
+        height = roundUpToNearestTwenty(height);
+
+        // Sprawdź, czy wysokość i szerokość są w zakresie
+        if (!priceTable[height] || width > 180) {
+            alert("Wybrane wymiary są poza zakresem.");
+            return;
+        }
+
+        // Obliczenie indeksu szerokości
+        let widthIndex = (width - 40) / 10;
+
+        // Pobierz cenę z tabeli
+        let price = priceTable[height][widthIndex];
+
+        // Obniżenie ceny o 5%
+        price = price * 0.95;
+
+        // Dodaj cenę za prowadzenie żyłkowe
+        if (cordGuide) {
+            price += 10;
+        }
+
+        // Wyświetl cenę
+        document.getElementById('summary').innerText = `Cena: ${price.toFixed(2)}zł`;
+
+        // Oblicz liczbę sztuk dla Allegro (5zł = 1 sztuka)
+        let units = Math.ceil(price / 5);
+        document.getElementById('units').innerText = `Liczba sztuk (Allegro): ${units}`;
+        
+        return { price, units };
+    }
+
+    function addToOrder() {
+        const result = calculatePrice();
+        const width = document.getElementById('width').value;
+        const height = document.getElementById('height').value;
+        const color = document.getElementById('color').value;
+        const sideControl = document.getElementById('side_control').value;
+        const installation = document.getElementById('installation').value;
+        const cordGuide = document.getElementById('cord_guide').checked ? 'Tak' : 'Nie';
+
+        const orderItem = {
+            szerokość: width,
+            wysokość: height,
+            kolor: color,
+            "strona sterowania": sideControl,
+            montaż: installation,
+            "prowadzenie żyłkowe": cordGuide,
+            cena: result.price.toFixed(2),
+            "sztuki (Allegro)": result.units
+        };
+
+        const orderList = document.getElementById('order-list');
+        const listItem = document.createElement('li');
+        listItem.innerText = `Szerokość: ${orderItem.szerokość} cm, Wysokość: ${orderItem.wysokość} cm, Kolor: ${orderItem.kolor}, Strona sterowania: ${orderItem["strona sterowania"]}, Montaż: ${orderItem.montaż}, Prowadzenie żyłkowe: ${orderItem["prowadzenie żyłkowe"]}, Cena: ${orderItem.cena} zł, Sztuki: ${orderItem["sztuki (Allegro)"]}`;
+        orderList.appendChild(listItem);
+
+        orders.push(orderItem);
+
+        // Zaktualizuj całkowitą cenę i sztuki
+        totalPrice += result.price;
+        totalUnits += result.units;
+
+        document.getElementById('total-price').innerText = `Całkowita cena: ${totalPrice.toFixed(2)}zł`;
+        document.getElementById('total-units').innerText = `Całkowita liczba sztuk (Allegro): ${totalUnits}`;
+    }
+
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFontSize(12);
+        doc.text("Zamówienie Żaluzji Drewnianych 25mm", 10, 10);
+
+        doc.autoTable({
+            head: [['Szerokość', 'Wysokość', 'Kolor', 'Strona sterowania', 'Montaż', 'Prowadzenie żyłkowe', 'Cena', 'Sztuki (Allegro)']],
+            body: orders.map(order => [
+                `${order.szerokość} cm`,
+                `${order.wysokość} cm`,
+                order.kolor,
+                order["strona sterowania"],
+                order.montaż,
+                order["prowadzenie żyłkowe"],
+                `${order.cena} zł`,
+                order["sztuki (Allegro)"]
+            ])
+        });
+
+        doc.text(`Całkowita cena: ${totalPrice.toFixed(2)}zł`, 10, doc.lastAutoTable.finalY + 10);
+        doc.save("zamowienie_zaluzji.pdf");
+    }
+</script>
+
+</body>
+</html>
